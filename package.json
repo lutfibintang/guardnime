@@ -1,0 +1,17 @@
+{
+  "name": "guard-nime",
+  "version": "1.0.0",
+  "description": "Discord moderation log bot that syncs Ban/Kick events to Google Sheets",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "keywords": ["discord", "moderation", "google-sheets"],
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.7",
+    "googleapis": "^144.0.0"
+  }
+}
