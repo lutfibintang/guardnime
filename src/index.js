@@ -173,8 +173,8 @@ async function main() {
       if (interaction.isChatInputCommand()) {
         if (interaction.commandName === 'ping') {
           const ws = interaction.client.ws.ping;
-          const sent = await interaction.reply({ content: '🏓 Pinging...', fetchReply: true });
-          const roundtrip = sent.createdTimestamp - interaction.createdTimestamp;
+          const response = await interaction.reply({ content: '🏓 Pinging...', withResponse: true });
+          const roundtrip = response.resource.message.createdTimestamp - interaction.createdTimestamp;
           await interaction.editReply(`🏓 **Pong!**\nLatency: **${roundtrip}ms**\nWebSocket: **${ws}ms**`);
           return;
         }
