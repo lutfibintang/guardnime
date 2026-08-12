@@ -4,9 +4,17 @@ const {
   TextInputBuilder,
   TextInputStyle,
   ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
 } = require('discord.js');
 const logger = require('../utils/logger');
 const { appendModeration, searchUserInSheet, getLeaderboard } = require('../google/sheets');
+const { sendLogToChannel } = require('../utils/discordLogger');
+const {
+  searchUserModeration,
+  saveSearchState,
+  getSearchState,
+} = require('../services/moderationSearch');
 
 /**
  * Mapping command name ke moderation type.
@@ -134,6 +142,19 @@ async function handleContextMenu(interaction) {
 
       await interaction.editReply({ embeds: [embed] });
       logger.info(`✅ Timeout | ${parsed.username} (${resolvedId}) | ${parsed.duration} — logged to Sheets.`);
+
+      // Kirim log embed ke Discord channel
+      await sendLogToChannel({
+        type: 'to',
+        caseNumber: 'Kura',
+        userId: resolvedId,
+        username: parsed.username,
+        reason: parsed.reason,
+        timestamp: now,
+        messageUrl,
+        duration: parsed.duration,
+        source: 'context-menu',
+      });
       return;
     }
 
@@ -265,6 +286,18 @@ async function handleModalSubmit(interaction) {
 
   await interaction.editReply({ embeds: [embed] });
   logger.info(`✅ Manual ${label} | ${username} (${userId}) — logged to Sheets.`);
+
+  // Kirim log embed ke Discord channel
+  await sendLogToChannel({
+    type: modType,
+    caseNumber: 'Manual',
+    userId,
+    username,
+    reason,
+    timestamp: now,
+    messageUrl,
+    source: 'manual',
+  });
 }
 
 /**
@@ -325,6 +358,19 @@ async function handleTimeoutSubmit(interaction) {
 
   await interaction.editReply({ embeds: [embed] });
   logger.info(`✅ Timeout | ${parsed.username} (${userId}) | ${parsed.duration} — logged to Sheets.`);
+
+  // Kirim log embed ke Discord channel
+  await sendLogToChannel({
+    type: 'to',
+    caseNumber: 'Kura',
+    userId,
+    username: parsed.username,
+    reason: parsed.reason,
+    timestamp: now,
+    messageUrl,
+    duration: parsed.duration,
+    source: 'context-menu',
+  });
 }
 
 /**
@@ -449,4 +495,244 @@ async function handleLeaderboard(interaction) {
   return true;
 }
 
-module.exports = { handleContextMenu, handleModalSubmit, handleSlashCommand, handleLeaderboard };
+const PAGE_SIZE = 10;
+
+/**
+ * Utility untuk membuat Embed dan ActionRow button pagination untuk /search.
+ */
+function buildSearchEmbedAndRow(searchResult, page = 1, searchId = '', targetUserObj = null) {
+  const totalCases = searchResult.cases.length;
+  const totalPages = Math.ceil(totalCases / PAGE_SIZE) || 1;
+  const currentPage = Math.max(1, Math.min(page, totalPages));
+
+  const embed = new EmbedBuilder()
+    .setTitle('🔎 Moderation History')
+    .setColor(0x5865f2)
+    .setTimestamp();
+
+  if (targetUserObj && typeof targetUserObj.displayAvatarURL === 'function') {
+    embed.setThumbnail(targetUserObj.displayAvatarURL({ size: 128 }));
+  }
+
+  const userDisplayName = searchResult.username || 'Unknown';
+  const userIdDisplay = searchResult.userId || '-';
+
+  let descriptionText = [
+    `👤 **User**`,
+    `${userDisplayName}`,
+    ``,
+    `🆔 **User ID**`,
+    `${userIdDisplay}`,
+    ``,
+    `📊 **Summary**`,
+    `🟣 TO: ${searchResult.summary.to}`,
+    `⚠️ Warn: ${searchResult.summary.warn}`,
+    `👢 Kick: ${searchResult.summary.kick}`,
+    `🔨 Ban: ${searchResult.summary.ban}`,
+    ``,
+    `📋 **Total Cases**: ${searchResult.summary.total}`,
+  ].join('\n');
+
+  if (totalCases === 0) {
+    descriptionText += `\n\n────────────────────\nTidak ada riwayat moderation yang ditemukan.`;
+  } else {
+    descriptionText += `\n\n────────────────────\n`;
+
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    const pageCases = searchResult.cases.slice(startIndex, startIndex + PAGE_SIZE);
+
+    if (totalCases > PAGE_SIZE) {
+      descriptionText += `📋 **Showing ${startIndex + 1}-${startIndex + pageCases.length} of ${totalCases} cases**\n\n`;
+    } else {
+      descriptionText += `📋 **Recent Cases**\n\n`;
+    }
+
+    const CATEGORY_MAP = {
+      to: { emoji: '🟣', label: 'TO' },
+      warn: { emoji: '⚠️', label: 'Warn' },
+      kick: { emoji: '👢', label: 'Kick' },
+      ban: { emoji: '🔨', label: 'Ban' },
+    };
+
+    for (const c of pageCases) {
+      const cat = CATEGORY_MAP[c.type] || { emoji: '❓', label: c.type.toUpperCase() };
+      let caseLabel = c.caseNumber;
+      if (!caseLabel.startsWith('#')) {
+        caseLabel = `#${caseLabel}`;
+      }
+
+      descriptionText += `${cat.emoji} **${cat.label}** — Case ${caseLabel}\n`;
+      descriptionText += `${c.date}\n`;
+      descriptionText += `Reason: ${c.reason}\n`;
+      if (c.duration) {
+        descriptionText += `Duration: ${c.duration}\n`;
+      }
+      descriptionText += `\n`;
+    }
+  }
+
+  embed.setDescription(descriptionText);
+
+  if (totalCases > PAGE_SIZE) {
+    embed.setFooter({
+      text: `Page ${currentPage}/${totalPages} • User ID: ${userIdDisplay} • made by Izuminaru.`,
+    });
+  } else {
+    embed.setFooter({
+      text: `User ID: ${userIdDisplay} • made by Izuminaru.`,
+    });
+  }
+
+  const components = [];
+  if (totalCases > PAGE_SIZE && searchId) {
+    const prevBtn = new ButtonBuilder()
+      .setCustomId(`search_prev_${searchId}`)
+      .setLabel('◀ Previous')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(currentPage <= 1);
+
+    const pageIndicatorBtn = new ButtonBuilder()
+      .setCustomId(`search_page_${searchId}`)
+      .setLabel(`${currentPage} / ${totalPages}`)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true);
+
+    const nextBtn = new ButtonBuilder()
+      .setCustomId(`search_next_${searchId}`)
+      .setLabel('Next ▶')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(currentPage >= totalPages);
+
+    const row = new ActionRowBuilder().addComponents(prevBtn, pageIndicatorBtn, nextBtn);
+    components.push(row);
+  }
+
+  return { embeds: [embed], components, currentPage, totalPages };
+}
+
+/**
+ * Handle Slash Command /search.
+ */
+async function handleSearchCommand(interaction) {
+  if (interaction.commandName !== 'search') return false;
+
+  // Response bersifat PUBLIC (dapat dilihat oleh semua orang)
+  await interaction.deferReply({ ephemeral: false });
+
+  const targetUser = interaction.options.getUser('user');
+  const targetIdOrName = interaction.options.getString('id');
+
+  let searchOptions = {};
+  let targetUserObj = targetUser || null;
+
+  if (targetUser) {
+    searchOptions = {
+      userId: targetUser.id,
+      username: targetUser.username,
+    };
+  } else if (targetIdOrName) {
+    const trimmed = targetIdOrName.trim();
+    if (/^\d{17,20}$/.test(trimmed)) {
+      searchOptions = { userId: trimmed };
+      try {
+        targetUserObj = await interaction.client.users.fetch(trimmed);
+        if (targetUserObj) {
+          searchOptions.username = targetUserObj.username;
+        }
+      } catch (err) {
+        // Fallback jika user ID tidak ada di Discord cache/fetch
+      }
+    } else {
+      searchOptions = { username: trimmed };
+    }
+  } else {
+    await interaction.editReply({
+      content: '❌ Harap tentukan user yang ingin dicari (contoh: `/search user:@Pel` atau `/search id:576343975938621440`).',
+    });
+    return true;
+  }
+
+  try {
+    const searchResult = await searchUserModeration(searchOptions);
+    const searchId = `srch_${Date.now()}_${interaction.user.id}`;
+
+    const { embeds, components, currentPage, totalPages } = buildSearchEmbedAndRow(
+      searchResult,
+      1,
+      searchId,
+      targetUserObj
+    );
+
+    if (searchResult.cases.length > PAGE_SIZE) {
+      saveSearchState(searchId, {
+        searchResult,
+        currentPage,
+        totalPages,
+        targetUserObj,
+      });
+    }
+
+    await interaction.editReply({ embeds, components });
+  } catch (err) {
+    logger.error('[ERROR] Failed to search moderation history');
+    if (searchOptions.userId) {
+      logger.error(`[ERROR] User ID: ${searchOptions.userId}`);
+    }
+    logger.error('Search command error:', err.message);
+
+    await interaction.editReply({
+      content: '❌ Gagal mengambil moderation history.\nSilakan coba lagi beberapa saat lagi.',
+    });
+  }
+
+  return true;
+}
+
+/**
+ * Handle pagination button interaction untuk /search.
+ */
+async function handleSearchPagination(interaction) {
+  if (!interaction.isButton()) return false;
+
+  const customId = interaction.customId;
+  if (!customId.startsWith('search_prev_') && !customId.startsWith('search_next_')) {
+    return false;
+  }
+
+  const isPrev = customId.startsWith('search_prev_');
+  const searchId = customId.replace(isPrev ? 'search_prev_' : 'search_next_', '');
+
+  const state = getSearchState(searchId);
+  if (!state) {
+    await interaction.reply({
+      content: '❌ Sesi pencarian ini telah expired. Silakan jalankan `/search` kembali.',
+      ephemeral: true,
+    });
+    return true;
+  }
+
+  if (isPrev) {
+    state.currentPage = Math.max(1, state.currentPage - 1);
+  } else {
+    state.currentPage = Math.min(state.totalPages, state.currentPage + 1);
+  }
+
+  const { embeds, components } = buildSearchEmbedAndRow(
+    state.searchResult,
+    state.currentPage,
+    searchId,
+    state.targetUserObj
+  );
+
+  await interaction.update({ embeds, components });
+  return true;
+}
+
+module.exports = {
+  handleContextMenu,
+  handleModalSubmit,
+  handleSlashCommand,
+  handleLeaderboard,
+  handleSearchCommand,
+  handleSearchPagination,
+};

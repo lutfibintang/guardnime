@@ -46,6 +46,13 @@ async function initGoogleSheets() {
 }
 
 /**
+ * Mengembalikan client Google Sheets dan spreadsheet ID yang sudah diinisialisasi.
+ */
+function getSheetsClient() {
+  return { sheetsClient, spreadsheetId };
+}
+
+/**
  * Format Date object ke string "DD/MM/YYYY HH:mm" dalam timezone Asia/Jakarta.
  * @param {Date} date
  * @returns {string}
@@ -282,6 +289,7 @@ async function getLeaderboard(type, limit = 10) {
 
 module.exports = {
   initGoogleSheets,
+  getSheetsClient,
   appendModeration,
   getMaxCaseNumber,
   formatDateJakarta,

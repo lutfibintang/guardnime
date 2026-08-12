@@ -2,11 +2,19 @@ require('dotenv').config();
 
 const { Client, GatewayIntentBits, Partials, Events, ActivityType, PermissionFlagsBits } = require('discord.js');
 const logger = require('./utils/logger');
+const { setClient: setLoggerClient } = require('./utils/discordLogger');
 const { loadProcessedIds } = require('./utils/store');
 const { initGoogleSheets } = require('./google/sheets');
 const { setupModerationListener } = require('./discord/moderationListener');
 const { registerCommands } = require('./commands/register');
-const { handleContextMenu, handleModalSubmit, handleSlashCommand, handleLeaderboard } = require('./commands/handler');
+const {
+  handleContextMenu,
+  handleModalSubmit,
+  handleSlashCommand,
+  handleLeaderboard,
+  handleSearchCommand,
+  handleSearchPagination,
+} = require('./commands/handler');
 
 const ALLOWED_ROLE_ID = '1087264689068724234';
 
@@ -83,6 +91,7 @@ async function main() {
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent,
+      GatewayIntentBits.AutoModerationExecution,
     ],
     partials: [Partials.Message, Partials.Channel],
     presence: {
@@ -101,6 +110,9 @@ async function main() {
   client.once(Events.ClientReady, async () => {
     logger.info(`✅ Bot logged in as ${client.user.tag}`);
     logger.info(`Watching channel: ${process.env.MODERATION_LOG_CHANNEL_ID}`);
+
+    // Set Discord client untuk discordLogger
+    setLoggerClient(client);
 
     // Set presence
     client.user.setPresence({
@@ -127,11 +139,12 @@ async function main() {
   // Handle interactions
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
-      // Permission check untuk semua fitur interaction (Context Menu, Slash Commands, Modal)
+      // Permission check untuk semua fitur interaction (Context Menu, Slash Commands, Modal, Button)
       if (
         interaction.isMessageContextMenuCommand() ||
         interaction.isChatInputCommand() ||
-        interaction.isModalSubmit()
+        interaction.isModalSubmit() ||
+        interaction.isButton()
       ) {
         if (!hasRequiredPermission(interaction)) {
           const denyMsg = '❌ Kamu tidak memiliki izin untuk menggunakan fitur ini.\nFitur ini hanya dapat digunakan oleh **Administrator dan Nime Guard** ';
@@ -144,14 +157,24 @@ async function main() {
         }
       }
 
+      // Button interaction: pagination untuk /search
+      if (interaction.isButton()) {
+        const handled = await handleSearchPagination(interaction);
+        if (handled) return;
+      }
+
       // Context menu: klik kanan message → Apps → Log Ban / Log Kick / Log TO
       if (interaction.isMessageContextMenuCommand()) {
         await handleContextMenu(interaction);
         return;
       }
 
-      // Slash commands: /list-*, /lb-*
+      // Slash commands: /search, /list-*, /lb-*
       if (interaction.isChatInputCommand()) {
+        if (interaction.commandName === 'search') {
+          await handleSearchCommand(interaction);
+          return;
+        }
         // Coba leaderboard dulu, lalu list check
         const handled = await handleLeaderboard(interaction);
         if (!handled) await handleSlashCommand(interaction);

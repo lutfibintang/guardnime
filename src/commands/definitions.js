@@ -69,6 +69,17 @@ const commands = [
   new SlashCommandBuilder()
     .setName('lb-to')
     .setDescription('🏆 Leaderboard user paling sering masuk List Timeout'),
+
+  // === SLASH COMMANDS: Search Moderation History ===
+  new SlashCommandBuilder()
+    .setName('search')
+    .setDescription('Search moderation history of a Discord user')
+    .addUserOption((opt) =>
+      opt.setName('user').setDescription('Search moderation history of a Discord user').setRequired(false)
+    )
+    .addStringOption((opt) =>
+      opt.setName('id').setDescription('Discord User ID or Username (fallback)').setRequired(false)
+    ),
 ];
 
 module.exports = { commands };
