@@ -169,8 +169,15 @@ async function main() {
         return;
       }
 
-      // Slash commands: /search, /list-*, /lb-*
+      // Slash commands: /ping, /search, /list-*, /lb-*
       if (interaction.isChatInputCommand()) {
+        if (interaction.commandName === 'ping') {
+          const ws = interaction.client.ws.ping;
+          const sent = await interaction.reply({ content: '🏓 Pinging...', fetchReply: true });
+          const roundtrip = sent.createdTimestamp - interaction.createdTimestamp;
+          await interaction.editReply(`🏓 **Pong!**\nLatency: **${roundtrip}ms**\nWebSocket: **${ws}ms**`);
+          return;
+        }
         if (interaction.commandName === 'search') {
           await handleSearchCommand(interaction);
           return;

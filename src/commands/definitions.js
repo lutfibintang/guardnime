@@ -80,6 +80,11 @@ const commands = [
     .addStringOption((opt) =>
       opt.setName('id').setDescription('Discord User ID or Username (fallback)').setRequired(false)
     ),
+
+  // === SLASH COMMANDS: Ping ===
+  new SlashCommandBuilder()
+    .setName('ping')
+    .setDescription('🏓 Cek latency bot'),
 ];
 
 module.exports = { commands };
