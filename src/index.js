@@ -14,6 +14,7 @@ const {
   handleLeaderboard,
   handleSearchCommand,
   handleSearchPagination,
+  handleAddRole,
 } = require('./commands/handler');
 
 const ALLOWED_ROLE_ID = '1087264689068724234';
@@ -91,7 +92,7 @@ async function main() {
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent,
-      GatewayIntentBits.AutoModerationExecution,
+      GatewayIntentBits.GuildMembers,
     ],
     partials: [Partials.Message, Partials.Channel],
     presence: {
@@ -180,6 +181,10 @@ async function main() {
         }
         if (interaction.commandName === 'search') {
           await handleSearchCommand(interaction);
+          return;
+        }
+        if (interaction.commandName === 'add-role') {
+          await handleAddRole(interaction);
           return;
         }
         // Coba leaderboard dulu, lalu list check

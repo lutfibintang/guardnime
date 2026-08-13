@@ -81,6 +81,29 @@ const commands = [
       opt.setName('id').setDescription('Discord User ID or Username (fallback)').setRequired(false)
     ),
 
+  // === SLASH COMMANDS: Add Role to Multiple Members ===
+  new SlashCommandBuilder()
+    .setName('add-role')
+    .setDescription('➕ Tambahkan 1 role ke maksimal 15 member sekaligus')
+    .addRoleOption((opt) =>
+      opt.setName('role').setDescription('Role yang ingin ditambahkan').setRequired(true)
+    )
+    .addUserOption((opt) => opt.setName('member1').setDescription('Member 1').setRequired(true))
+    .addUserOption((opt) => opt.setName('member2').setDescription('Member 2').setRequired(false))
+    .addUserOption((opt) => opt.setName('member3').setDescription('Member 3').setRequired(false))
+    .addUserOption((opt) => opt.setName('member4').setDescription('Member 4').setRequired(false))
+    .addUserOption((opt) => opt.setName('member5').setDescription('Member 5').setRequired(false))
+    .addUserOption((opt) => opt.setName('member6').setDescription('Member 6').setRequired(false))
+    .addUserOption((opt) => opt.setName('member7').setDescription('Member 7').setRequired(false))
+    .addUserOption((opt) => opt.setName('member8').setDescription('Member 8').setRequired(false))
+    .addUserOption((opt) => opt.setName('member9').setDescription('Member 9').setRequired(false))
+    .addUserOption((opt) => opt.setName('member10').setDescription('Member 10').setRequired(false))
+    .addUserOption((opt) => opt.setName('member11').setDescription('Member 11').setRequired(false))
+    .addUserOption((opt) => opt.setName('member12').setDescription('Member 12').setRequired(false))
+    .addUserOption((opt) => opt.setName('member13').setDescription('Member 13').setRequired(false))
+    .addUserOption((opt) => opt.setName('member14').setDescription('Member 14').setRequired(false))
+    .addUserOption((opt) => opt.setName('member15').setDescription('Member 15').setRequired(false)),
+
   // === SLASH COMMANDS: Ping ===
   new SlashCommandBuilder()
     .setName('ping')

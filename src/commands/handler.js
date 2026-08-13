@@ -728,6 +728,123 @@ async function handleSearchPagination(interaction) {
   return true;
 }
 
+/**
+ * Handle /add-role slash command.
+ * Menambahkan 1 role ke maksimal 5 member sekaligus.
+ *
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction
+ * @returns {boolean} true jika command di-handle
+ */
+async function handleAddRole(interaction) {
+  if (interaction.commandName !== 'add-role') return false;
+
+  await interaction.deferReply();
+
+  const role = interaction.options.getRole('role');
+
+  // Kumpulkan member unik (1-5)
+  const memberKeys = [
+    'member1', 'member2', 'member3', 'member4', 'member5',
+    'member6', 'member7', 'member8', 'member9', 'member10',
+    'member11', 'member12', 'member13', 'member14', 'member15',
+  ];
+  const seenIds = new Set();
+  const members = [];
+
+  for (const key of memberKeys) {
+    const user = interaction.options.getUser(key);
+    if (user && !seenIds.has(user.id)) {
+      seenIds.add(user.id);
+      members.push(user);
+    }
+  }
+
+  if (members.length === 0) {
+    await interaction.editReply('❌ Tidak ada member yang dipilih.');
+    return true;
+  }
+
+  // Cek apakah bot punya posisi role lebih tinggi dari role target
+  const botMember = interaction.guild.members.me;
+  if (!botMember) {
+    await interaction.editReply('❌ Tidak bisa mendapatkan info bot di server ini.');
+    return true;
+  }
+
+  if (role.position >= botMember.roles.highest.position) {
+    await interaction.editReply(
+      `❌ Bot tidak bisa menambahkan role **${role.name}** karena posisi role tersebut lebih tinggi atau sama dengan role bot.`
+    );
+    return true;
+  }
+
+  if (role.managed) {
+    await interaction.editReply(
+      `❌ Role **${role.name}** adalah managed role (milik bot/integrasi) dan tidak bisa ditambahkan secara manual.`
+    );
+    return true;
+  }
+
+  const results = [];
+
+  for (const user of members) {
+    try {
+      const guildMember = await interaction.guild.members.fetch(user.id);
+
+      if (guildMember.roles.cache.has(role.id)) {
+        results.push({ user, status: 'skipped', reason: 'Sudah punya role ini' });
+        continue;
+      }
+
+      await guildMember.roles.add(role.id);
+      results.push({ user, status: 'success' });
+    } catch (err) {
+      logger.error(`[ADD-ROLE] Failed to add role to ${user.username} (${user.id}): ${err.message}`);
+      results.push({ user, status: 'failed', reason: err.message });
+    }
+  }
+
+  // Build result embed
+  const successCount = results.filter((r) => r.status === 'success').length;
+  const skippedCount = results.filter((r) => r.status === 'skipped').length;
+  const failedCount = results.filter((r) => r.status === 'failed').length;
+
+  const STATUS_EMOJI = {
+    success: '✅',
+    skipped: '⏭️',
+    failed: '❌',
+  };
+
+  let resultText = '';
+  for (const r of results) {
+    const emoji = STATUS_EMOJI[r.status];
+    const note = r.reason ? ` — ${r.reason}` : '';
+    resultText += `${emoji} <@${r.user.id}> (${r.user.username})${note}\n`;
+  }
+
+  const embed = new EmbedBuilder()
+    .setTitle('➕ Add Role — Result')
+    .setDescription(
+      `**Role:** <@&${role.id}>\n**Target:** ${members.length} member(s)\n\n${resultText}`
+    )
+    .addFields(
+      { name: '✅ Berhasil', value: `${successCount}`, inline: true },
+      { name: '⏭️ Sudah punya', value: `${skippedCount}`, inline: true },
+      { name: '❌ Gagal', value: `${failedCount}`, inline: true }
+    )
+    .setColor(failedCount > 0 ? 0xffa500 : 0x57f287)
+    .setFooter({ text: `Executed by ${interaction.user.username} • made by Izuminaru.` })
+    .setTimestamp();
+
+  await interaction.editReply({ embeds: [embed] });
+
+  logger.info(
+    `✅ [ADD-ROLE] ${interaction.user.username} added role "${role.name}" to ${successCount}/${members.length} members.`
+  );
+
+  return true;
+}
+
 module.exports = {
   handleContextMenu,
   handleModalSubmit,
@@ -735,4 +852,5 @@ module.exports = {
   handleLeaderboard,
   handleSearchCommand,
   handleSearchPagination,
+  handleAddRole,
 };
