@@ -845,6 +845,105 @@ async function handleAddRole(interaction) {
   return true;
 }
 
+/**
+ * Jockie Music Bot IDs.
+ */
+const JOCKIE_BOTS = [
+  { id: '801167849291776020', label: 'Jockie Music Premium' },
+  { id: '412347780841865216', label: 'Cucu Jockie' },
+  { id: '411916947773587456', label: 'Mas Jockie' },
+  { id: '412347257233604609', label: 'Pak Jockie' },
+  { id: '412347553141751808', label: 'Akang Jockie' },
+];
+
+/**
+ * Handle /jockie-check slash command.
+ * Scan semua voice channel di guild dan cek apakah bot Jockie Music ada di sana.
+ *
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction
+ * @returns {boolean} true jika command di-handle
+ */
+async function handleJockieCheck(interaction) {
+  if (interaction.commandName !== 'jockie-check') return false;
+
+  await interaction.deferReply();
+
+  const guild = interaction.guild;
+
+  // Pastikan voice states tersedia
+  if (!guild) {
+    await interaction.editReply('❌ Command ini hanya bisa digunakan di dalam server.');
+    return true;
+  }
+
+  const jockieIds = new Set(JOCKIE_BOTS.map((b) => b.id));
+  const jockieLabelMap = Object.fromEntries(JOCKIE_BOTS.map((b) => [b.id, b.label]));
+
+  // Scan voice states di guild untuk cari bot Jockie Music
+  const found = [];
+  const notFound = [];
+
+  for (const bot of JOCKIE_BOTS) {
+    const voiceState = guild.voiceStates.cache.get(bot.id);
+    if (voiceState && voiceState.channel) {
+      const channel = voiceState.channel;
+      const memberCount = channel.members.filter((m) => !m.user.bot).size;
+      found.push({
+        label: bot.label,
+        botId: bot.id,
+        channelName: channel.name,
+        channelId: channel.id,
+        guildId: guild.id,
+        memberCount,
+      });
+    } else {
+      notFound.push(bot);
+    }
+  }
+
+  // Build embed
+  const embed = new EmbedBuilder()
+    .setTitle('🎵 Jockie Music — Voice Channel Status')
+    .setColor(found.length > 0 ? 0x57f287 : 0x95a5a6)
+    .setTimestamp();
+
+  let description = '';
+
+  if (found.length > 0) {
+    description += '**🔊 Sedang di Voice Channel:**\n\n';
+    for (const f of found) {
+      const vcLink = `https://discord.com/channels/${f.guildId}/${f.channelId}`;
+      description += `🟢 **${f.label}**\n`;
+      description += `┗ [🔊 ${f.channelName}](${vcLink}) — ${f.memberCount} listener${f.memberCount !== 1 ? 's' : ''}\n\n`;
+    }
+  }
+
+  if (notFound.length > 0) {
+    if (found.length > 0) description += '────────────────────\n\n';
+    description += '**😴 Tidak di Voice Channel:**\n\n';
+    for (const nf of notFound) {
+      description += `⚫ **${nf.label}** — *Idle*\n`;
+    }
+  }
+
+  if (found.length === 0 && notFound.length === 0) {
+    description = 'Tidak ada bot Jockie Music yang terdaftar.';
+  }
+
+  embed.setDescription(description);
+  embed.setFooter({
+    text: `${found.length}/${JOCKIE_BOTS.length} bot aktif di voice • made by Izuminaru.`,
+  });
+
+  await interaction.editReply({ embeds: [embed] });
+
+  logger.info(
+    `🎵 [JOCKIE-CHECK] ${interaction.user.username} checked Jockie Music status — ${found.length}/${JOCKIE_BOTS.length} active.`
+  );
+
+  return true;
+}
+
 module.exports = {
   handleContextMenu,
   handleModalSubmit,
@@ -853,4 +952,5 @@ module.exports = {
   handleSearchCommand,
   handleSearchPagination,
   handleAddRole,
+  handleJockieCheck,
 };

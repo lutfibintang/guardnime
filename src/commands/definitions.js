@@ -104,6 +104,11 @@ const commands = [
     .addUserOption((opt) => opt.setName('member14').setDescription('Member 14').setRequired(false))
     .addUserOption((opt) => opt.setName('member15').setDescription('Member 15').setRequired(false)),
 
+  // === SLASH COMMANDS: Jockie Music Voice Check ===
+  new SlashCommandBuilder()
+    .setName('jockie-check')
+    .setDescription('🎵 Cek bot Jockie Music sedang berada di voice channel mana saja'),
+
   // === SLASH COMMANDS: Ping ===
   new SlashCommandBuilder()
     .setName('ping')

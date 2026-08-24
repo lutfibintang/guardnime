@@ -15,6 +15,7 @@ const {
   handleSearchCommand,
   handleSearchPagination,
   handleAddRole,
+  handleJockieCheck,
 } = require('./commands/handler');
 
 const ALLOWED_ROLE_ID = '1087264689068724234';
@@ -93,6 +94,7 @@ async function main() {
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent,
       GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.GuildVoiceStates,
     ],
     partials: [Partials.Message, Partials.Channel],
     presence: {
@@ -185,6 +187,10 @@ async function main() {
         }
         if (interaction.commandName === 'add-role') {
           await handleAddRole(interaction);
+          return;
+        }
+        if (interaction.commandName === 'jockie-check') {
+          await handleJockieCheck(interaction);
           return;
         }
         // Coba leaderboard dulu, lalu list check
