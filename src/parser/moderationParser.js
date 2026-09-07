@@ -1,7 +1,7 @@
 const logger = require('../utils/logger');
 
-// Auto-listener hanya untuk WARN — Ban/Kick ditangani oleh slash command
-const AUTO_LISTEN_TYPES = ['warn'];
+// Auto-listener untuk WARN dan KICK — Ban ditangani oleh slash command
+const AUTO_LISTEN_TYPES = ['warn', 'kick'];
 
 /**
  * Regex untuk parsing title/author moderation embed.
